@@ -1,99 +1,106 @@
-const readline = require("readline");
+const express = require('express');
+const app = express();
+app.use(express.json());
 
-// Simple in-memory CLI to-do list
-// Save as myassignment.js and run with: node myassignment.js
+// Storage database
+let books = [
+  { id: 1, title: "Zero to One", author: "Peter Thiel" },
+  { id: 2, title: "The Alchemist", author: "Paulo Coelho" }
+];
 
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    prompt: "todo> ",
+// -----------------------------
+// 1. GET /books  (all books)
+// -----------------------------
+app.get('/books', (req, res) => {
+  res.json(books);
 });
 
-const tasks = [];
+// -----------------------------
+// 2. GET /books/:id  (single book)
+// -----------------------------
+app.get('/books/:id', (req, res) => {
+  const book = books.find(b => b.id == req.params.id);
+  if (!book) {
+    return res.status(404).json({ message: "Book not found" });
+  }
+  res.json(book);
+});
 
-function addTask(text) {
-    if (!text) return console.log("Usage: add <task description>");
-    tasks.push({ text: text.trim(), done: false });
-    console.log(`Added: "${text.trim()}"`);
-}
+// -----------------------------
+// 3. POST /books  (create)
+// -----------------------------
+app.post('/books', (req, res) => {
+  const { title, author } = req.body;
 
-function listTasks() {
-    if (tasks.length === 0) {
-        console.log("No tasks yet.");
-        return;
-    }
-    tasks.forEach((t, i) => {
-        console.log(`${i + 1}. [${t.done ? "x" : " "}] ${t.text}`);
-    });
-}
+  // Basic validation
+  if (!title || title.trim() === "") {
+    return res.status(400).json({ message: "Title is required" });
+  }
 
-function removeTask(indexStr) {
-    const i = parseInt(indexStr, 10) - 1;
-    if (Number.isNaN(i) || i < 0 || i >= tasks.length) {
-        return console.log("Usage: remove <task number>");
-    }
-    const removed = tasks.splice(i, 1)[0];
-    console.log(`Removed: "${removed.text}"`);
-}
+  const newBook = {
+    id: books.length + 1,
+    title,
+    author
+  };
 
-function toggleDone(indexStr) {
-    const i = parseInt(indexStr, 10) - 1;
-    if (Number.isNaN(i) || i < 0 || i >= tasks.length) {
-        return console.log("Usage: done <task number>");
-    }
-    tasks[i].done = !tasks[i].done;
-    console.log(
-        `${tasks[i].done ? "Completed" : "Marked incomplete"}: "${tasks[i].text}"`
-    );
-}
+  books.push(newBook);
+  res.status(201).json(newBook);
+});
 
-function help() {
-    console.log(`Commands:
-    add <text>      - add a new task
-    list            - list all tasks
-    remove <number> - remove a task
-    done <number>   - toggle task complete
-    clear           - clear all tasks
-    help            - show this help
-    exit            - quit
-    `);
-}
+// -----------------------------
+// 4. PUT /books/:id  (update)
+// -----------------------------
+app.put('/books/:id', (req, res) => {
+  const book = books.find(b => b.id == req.params.id);
+  if (!book) {
+    return res.status(404).json({ message: "Book not found" });
+  }
 
-rl.prompt();
+  const { title, author } = req.body;
 
-rl.on("line", (line) => {
-    const [cmd, ...rest] = line.trim().split(" ");
-    const arg = rest.join(" ");
-    switch ((cmd || "").toLowerCase()) {
-        case "add":
-            addTask(arg);
-            break;
-        case "list":
-            listTasks();
-            break;
-        case "remove":
-            removeTask(arg);
-            break;
-        case "done":
-            toggleDone(arg);
-            break;
-        case "clear":
-            tasks.length = 0;
-            console.log("All tasks cleared.");
-            break;
-        case "help":
-            help();
-            break;
-        case "exit":
-            rl.close();
-            return;
-        case "":
-            break;
-        default:
-            console.log(`Unknown command: ${cmd}. Type "help" for commands.`);
-    }
-    rl.prompt();
-}).on("close", () => {
-    console.log("Goodbye.");
-    process.exit(0);
+  if (title !== undefined && title.trim() === "") {
+    return res.status(400).json({ message: "Title cannot be empty" });
+  }
+
+  if (title) book.title = title;
+  if (author) book.author = author;
+
+  res.json(book);
+});
+
+// -----------------------------
+// 5. DELETE /books/:id
+// -----------------------------
+app.delete('/books/:id', (req, res) => {
+  const id = req.params.id;
+  const exists = books.some(b => b.id == id);
+
+  if (!exists) {
+    return res.status(404).json({ message: "Book not found" });
+  }
+
+  books = books.filter(b => b.id != id);
+  res.json({ message: "Book deleted successfully" });
+});
+
+// -----------------------------
+// EXTRA: /books/search?author=John
+// -----------------------------
+app.get('/books/search', (req, res) => {
+  const { author } = req.query;
+
+  if (!author) {
+    return res.status(400).json({ message: "Author query is required" });
+  }
+
+  const results = books.filter(b =>
+    b.author.toLowerCase().includes(author.toLowerCase())
+  );
+
+  res.json(results);
+});
+
+// -----------------------------
+app.listen(3000, () => {
+  console.log("Book API running on port 3000");
 });
